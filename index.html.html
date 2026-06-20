@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L'Artisan | Fine Dining Experience</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Montserrat:wght@200;300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --gold: #c9a84c; --gold-light: #e8d5a3; --gold-dark: #a08030;
+            --black: #0a0a0a; --dark: #111111; --dark-lighter: #1a1a1a;
+            --cream: #f5f0e8; --white: #ffffff;
+        }
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: var(--black); color: var(--cream);
+            overflow-x: hidden; cursor: none;
+        }
+        .cursor {
+            width: 20px; height: 20px; border: 1px solid var(--gold);
+            border-radius: 50%; position: fixed; pointer-events: none;
+            z-index: 9999; transition: transform 0.1s ease, background 0.3s ease;
+            mix-blend-mode: difference;
+        }
+        .cursor-follower {
+            width: 8px; height: 8px; background: var(--gold);
+            border-radius: 50%; position: fixed; pointer-events: none;
+            z-index: 9998; transition: transform 0.15s ease;
+        }
+        .cursor.hover { transform: scale(2.5); background: rgba(201,168,76,0.1); }
+        .preloader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--black); z-index: 10000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 1s ease, visibility 1s ease;
+        }
+        .preloader.hidden { opacity: 0; visibility: hidden; }
+        .preloader-text {
+            font-family: 'Playfair Display', serif; font-size: 3rem; color: var(--gold);
+            letter-spacing: 8px; opacity: 0; animation: fadeInUp 1s ease forwards 0.5s;
+        }
+        .preloader-line {
+            width: 0; height: 1px; background: var(--gold); margin-top: 20px;
+            animation: lineExpand 1.5s ease forwards 1s;
+        }
+        .preloader-sub {
+            font-family: 'Cormorant Garamond', serif; font-size: 1rem; color: var(--gold-light);
+            letter-spacing: 4px; margin-top: 15px; opacity: 0;
+            animation: fadeInUp 1s ease forwards 2s;
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes lineExpand { from { width: 0; } to { width: 200px; } }
+        .nav {
+            position: fixed; top: 0; left: 0; width: 100%; padding: 25px 60px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 1000; transition: all 0.5s ease;
+        }
+        .nav.scrolled { background: rgba(10,10,10,0.95); backdrop-filter: blur(20px); padding: 15px 60px; }
+        .nav-logo { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--gold); letter-spacing: 4px; text-decoration: none; }
+        .nav-links { display: flex; gap: 40px; list-style: none; }
+        .nav-links a {
+            font-size: 0.75rem; color: var(--cream); text-decoration: none;
+            letter-spacing: 3px; text-transform: uppercase; position: relative; padding: 5px 0; transition: color 0.3s ease;
+        }
+        .nav-links a::after { content: ''; position: absolute; bottom: 0; left: 0; width: 0; height: 1px; background: var(--gold); transition: width 0.4s ease; }
+        .nav-links a:hover { color: var(--gold); }
+        .nav-links a:hover::after { width: 100%; }
+        .nav-reserve {
+            padding: 12px 30px; border: 1px solid var(--gold); color: var(--gold);
+            font-size: 0.7rem; letter-spacing: 3px; text-transform: uppercase;
+            background: transparent; cursor: none; transition: all 0.4s ease; font-family: 'Montserrat', sans-serif;
+        }
+        .nav-reserve:hover { background: var(--gold); color: var(--black); }
+        .hero { position: relative; width: 100%; height: 100vh; overflow: hidden; }
+        #hero-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .hero-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(10,10,10,0.3) 0%, rgba(10,10,10,0.1) 40%, rgba(10,10,10,0.6) 100%);
+            z-index: 2;
+        }
+        .hero-content {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; z-index: 3; width: 90%; max-width: 900px;
+        }
+        .hero-subtitle {
+            font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; color: var(--gold-light);
+            letter-spacing: 8px; text-transform: uppercase; margin-bottom: 20px;
+            opacity: 0; transform: translateY(30px);
+        }
+        .hero-title {
+            font-family: 'Playfair Display', serif; font-size: clamp(3rem, 8vw, 7rem);
+            color: var(--white); line-height: 1.1; margin-bottom: 30px;
+            opacity: 0; transform: translateY(40px);
+        }
+        .hero-title span { display: block; font-style: italic; color: var(--gold); }
+        .hero-desc {
+            font-family: 'Cormorant Garamond', serif; font-size: 1.3rem;
+            color: rgba(245,240,232,0.7); line-height: 1.8; max-width: 600px;
+            margin: 0 auto 40px; opacity: 0; transform: translateY(30px);
+        }
+        .hero-cta {
+            display: inline-flex; align-items: center; gap: 15px;
+            padding: 18px 50px; background: var(--gold); color: var(--black);
+            font-size: 0.8rem; letter-spacing: 4px; text-transform: uppercase;
+            text-decoration: none; font-weight: 500; transition: all 0.4s ease;
+            opacity: 0; transform: translateY(30px);
+        }
+        .hero-cta:hover { background: var(--gold-light); transform: translateY(-2px); box-shadow: 0 10px 40px rgba(201,168,76,0.3); }
+        .hero-cta svg { width: 20px; height: 20px; transition: transform 0.3s ease; }
+        .hero-cta:hover svg { transform: translateX(5px); }
+        .scroll-indicator {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0;
+        }
+        .scroll-indicator span { font-size: 0.6rem; letter-spacing: 4px; text-transform: uppercase; color: var(--gold-light); }
+        .scroll-line { width: 1px; height: 60px; background: linear-gradient(to bottom, var(--gold), transparent); animation: scrollPulse 2s ease-in-out infinite; }
+        @keyframes scrollPulse { 0%,100% { opacity: 0.3; transform: scaleY(0.5); } 50% { opacity: 1; transform: scaleY(1); } }
+        .slideshow-section { position: relative; width: 100%; height: 100vh; overflow: hidden; background: var(--black); }
+        .slideshow-container { position: relative; width: 100%; height: 100%; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.5s ease; }
+        .slide.active { opacity: 1; }
+        .slide-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; transform: scale(1.1); transition: transform 8s ease; }
+        .slide.active .slide-bg { transform: scale(1); }
+        .slide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to right, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0.4) 50%, rgba(10,10,10,0.2) 100%); }
+        .slide-content { position: absolute; top: 50%; left: 10%; transform: translateY(-50%); max-width: 500px; z-index: 2; }
+        .slide-number { font-family: 'Playfair Display', serif; font-size: 6rem; color: rgba(201,168,76,0.15); line-height: 1; margin-bottom: -20px; }
+        .slide-label { font-size: 0.7rem; letter-spacing: 6px; text-transform: uppercase; color: var(--gold); margin-bottom: 15px; }
+        .slide-title { font-family: 'Playfair Display', serif; font-size: 3rem; color: var(--white); line-height: 1.2; margin-bottom: 20px; }
+        .slide-desc { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; color: rgba(245,240,232,0.7); line-height: 1.7; margin-bottom: 30px; }
+        .slide-link { display: inline-flex; align-items: center; gap: 10px; color: var(--gold); font-size: 0.75rem; letter-spacing: 3px; text-transform: uppercase; text-decoration: none; transition: gap 0.3s ease; }
+        .slide-link:hover { gap: 20px; }
+        .slideshow-controls { position: absolute; bottom: 60px; right: 60px; display: flex; align-items: center; gap: 30px; z-index: 10; }
+        .slide-progress { display: flex; gap: 8px; }
+        .progress-bar { width: 50px; height: 2px; background: rgba(201,168,76,0.2); position: relative; overflow: hidden; }
+        .progress-fill { position: absolute; top: 0; left: 0; height: 100%; width: 0; background: var(--gold); transition: width 0.1s linear; }
+        .progress-bar.active .progress-fill { animation: progressFill 6s linear forwards; }
+        @keyframes progressFill { from { width: 0; } to { width: 100%; } }
+        .slide-arrows { display: flex; gap: 15px; }
+        .slide-arrow { width: 50px; height: 50px; border: 1px solid rgba(201,168,76,0.3); background: transparent; color: var(--gold); display: flex; align-items: center; justify-content: center; cursor: none; transition: all 0.3s ease; }
+        .slide-arrow:hover { background: var(--gold); color: var(--black); border-color: var(--gold); }
+        .slide-counter { font-family: 'Playfair Display', serif; font-size: 1rem; color: var(--gold); letter-spacing: 2px; }
+        .slide-counter span { color: rgba(245,240,232,0.4); }
+        .about-section { padding: 150px 60px; background: var(--dark); position: relative; overflow: hidden; }
+        .about-section::before { content: ''; position: absolute; top: -100px; right: -100px; width: 400px; height: 400px; border: 1px solid rgba(201,168,76,0.05); border-radius: 50%; }
+        .about-container { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: center; }
+        .about-images { position: relative; height: 600px; }
+        .about-img-main { position: absolute; top: 0; left: 0; width: 80%; height: 80%; object-fit: cover; z-index: 2; }
+        .about-img-secondary { position: absolute; bottom: 0; right: 0; width: 60%; height: 50%; object-fit: cover; z-index: 1; border: 10px solid var(--dark); }
+        .about-img-frame { position: absolute; top: -20px; left: -20px; width: 100px; height: 100px; border-top: 2px solid var(--gold); border-left: 2px solid var(--gold); }
+        .about-content { padding-left: 20px; }
+        .about-label { font-size: 0.7rem; letter-spacing: 6px; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; }
+        .about-title { font-family: 'Playfair Display', serif; font-size: 3.5rem; color: var(--white); line-height: 1.1; margin-bottom: 30px; }
+        .about-title span { color: var(--gold); font-style: italic; }
+        .about-text { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; color: rgba(245,240,232,0.6); line-height: 1.9; margin-bottom: 25px; }
+        .about-signature { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--gold); font-style: italic; margin-top: 30px; }
+        .menu-section { padding: 150px 60px; background: var(--black); position: relative; }
+        .menu-header { text-align: center; margin-bottom: 80px; }
+        .menu-label { font-size: 0.7rem; letter-spacing: 6px; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; }
+        .menu-title { font-family: 'Playfair Display', serif; font-size: 3.5rem; color: var(--white); }
+        .menu-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+        .menu-card { background: var(--dark-lighter); padding: 40px; border: 1px solid rgba(201,168,76,0.1); transition: all 0.5s ease; position: relative; overflow: hidden; }
+        .menu-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform 0.5s ease; }
+        .menu-card:hover::before { transform: scaleX(1); }
+        .menu-card:hover { border-color: rgba(201,168,76,0.3); transform: translateY(-10px); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .menu-card-icon { font-size: 2.5rem; margin-bottom: 20px; }
+        .menu-card-title { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--white); margin-bottom: 15px; }
+        .menu-card-desc { font-family: 'Cormorant Garamond', serif; font-size: 1rem; color: rgba(245,240,232,0.5); line-height: 1.7; margin-bottom: 25px; }
+        .menu-card-price { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--gold); }
+        .menu-card-price span { font-size: 0.9rem; color: rgba(245,240,232,0.4); }
+        .gallery-section { padding: 150px 0; background: var(--dark); overflow: hidden; }
+        .gallery-header { text-align: center; padding: 0 60px; margin-bottom: 80px; }
+        .gallery-label { font-size: 0.7rem; letter-spacing: 6px; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; }
+        .gallery-title { font-family: 'Playfair Display', serif; font-size: 3.5rem; color: var(--white); }
+        .gallery-marquee { display: flex; gap: 20px; animation: marquee 40s linear infinite; }
+        .gallery-marquee:hover { animation-play-state: paused; }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .gallery-item { flex-shrink: 0; width: 400px; height: 500px; position: relative; overflow: hidden; }
+        .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
+        .gallery-item:hover img { transform: scale(1.1); }
+        .gallery-item-overlay { position: absolute; bottom: 0; left: 0; width: 100%; padding: 30px; background: linear-gradient(to top, rgba(10,10,10,0.9), transparent); transform: translateY(100%); transition: transform 0.4s ease; }
+        .gallery-item:hover .gallery-item-overlay { transform: translateY(0); }
+        .gallery-item-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; color: var(--white); }
+        .testimonials-section { padding: 150px 60px; background: var(--black); position: relative; }
+        .testimonials-container { max-width: 1000px; margin: 0 auto; text-align: center; }
+        .testimonials-label { font-size: 0.7rem; letter-spacing: 6px; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; }
+        .testimonials-title { font-family: 'Playfair Display', serif; font-size: 3.5rem; color: var(--white); margin-bottom: 60px; }
+        .testimonial-slider { position: relative; overflow: hidden; }
+        .testimonial-slide { opacity: 0; position: absolute; top: 0; left: 0; width: 100%; transition: opacity 0.8s ease; }
+        .testimonial-slide.active { opacity: 1; position: relative; }
+        .testimonial-quote { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: rgba(245,240,232,0.8); line-height: 1.6; font-style: italic; margin-bottom: 40px; }
+        .testimonial-author { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: var(--gold); }
+        .testimonial-role { font-size: 0.8rem; color: rgba(245,240,232,0.4); letter-spacing: 3px; text-transform: uppercase; margin-top: 5px; }
+        .testimonial-dots { display: flex; justify-content: center; gap: 12px; margin-top: 50px; }
+        .testimonial-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--gold); background: transparent; cursor: none; transition: all 0.3s ease; }
+        .testimonial-dot.active { background: var(--gold); }
+        .reservation-section { padding: 150px 60px; background: linear-gradient(to bottom, var(--dark) 0%, var(--black) 100%); position: relative; overflow: hidden; }
+        .reservation-section::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 600px; height: 600px; border: 1px solid rgba(201,168,76,0.05); border-radius: 50%; pointer-events: none; }
+        .reservation-container { max-width: 800px; margin: 0 auto; text-align: center; }
+        .reservation-label { font-size: 0.7rem; letter-spacing: 6px; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; }
+        .reservation-title { font-family: 'Playfair Display', serif; font-size: 3.5rem; color: var(--white); margin-bottom: 20px; }
+        .reservation-subtitle { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; color: rgba(245,240,232,0.5); margin-bottom: 60px; }
+        .reservation-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; text-align: left; }
+        .form-group { position: relative; }
+        .form-group.full { grid-column: span 2; }
+        .form-group label { display: block; font-size: 0.65rem; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 15px 0; background: transparent; border: none; border-bottom: 1px solid rgba(201,168,76,0.2); color: var(--white); font-family: 'Montserrat', sans-serif; font-size: 0.9rem; outline: none; transition: border-color 0.3s ease; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-bottom-color: var(--gold); }
+        .form-group input::placeholder, .form-group textarea::placeholder { color: rgba(245,240,232,0.3); }
+        .form-group select { cursor: none; appearance: none; }
+        .form-group select option { background: var(--dark); color: var(--white); }
+        .form-group textarea { resize: none; height: 100px; }
+        .reservation-submit { grid-column: span 2; padding: 20px; background: var(--gold); color: var(--black); font-size: 0.8rem; letter-spacing: 4px; text-transform: uppercase; font-weight: 500; border: none; cursor: none; transition: all 0.4s ease; margin-top: 20px; }
+        .reservation-submit:hover { background: var(--gold-light); transform: translateY(-2px); box-shadow: 0 10px 40px rgba(201,168,76,0.3); }
+        .footer { padding: 80px 60px 40px; background: var(--black); border-top: 1px solid rgba(201,168,76,0.1); }
+        .footer-container { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 60px; }
+        .footer-brand { font-family: 'Playfair Display', serif; font-size: 2rem; color: var(--gold); letter-spacing: 4px; margin-bottom: 20px; }
+        .footer-desc { font-family: 'Cormorant Garamond', serif; font-size: 1rem; color: rgba(245,240,232,0.5); line-height: 1.8; max-width: 300px; }
+        .footer-title { font-size: 0.7rem; letter-spacing: 4px; text-transform: uppercase; color: var(--gold); margin-bottom: 25px; }
+        .footer-links { list-style: none; }
+        .footer-links li { margin-bottom: 12px; }
+        .footer-links a { color: rgba(245,240,232,0.5); text-decoration: none; font-size: 0.85rem; transition: color 0.3s ease; }
+        .footer-links a:hover { color: var(--gold); }
+        .footer-contact { color: rgba(245,240,232,0.5); font-size: 0.85rem; line-height: 2; }
+        .footer-contact span { color: var(--gold); }
+        .footer-bottom { max-width: 1400px; margin: 60px auto 0; padding-top: 30px; border-top: 1px solid rgba(201,168,76,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .footer-copy { font-size: 0.75rem; color: rgba(245,240,232,0.3); letter-spacing: 2px; }
+        .footer-social { display: flex; gap: 20px; }
+        .footer-social a { width: 40px; height: 40px; border: 1px solid rgba(201,168,76,0.2); display: flex; align-items: center; justify-content: center; color: var(--gold); text-decoration: none; transition: all 0.3s ease; }
+        .footer-social a:hover { background: var(--gold); color: var(--black); border-color: var(--gold); }
+        @media (max-width: 1024px) {
+            .about-container { grid-template-columns: 1fr; gap: 60px; }
+            .menu-grid { grid-template-columns: repeat(2, 1fr); }
+            .footer-container { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .nav { padding: 20px 30px; }
+            .nav-links { display: none; }
+            .hero-title { font-size: 2.5rem; }
+            .slideshow-controls { right: 30px; bottom: 30px; }
+            .about-section, .menu-section, .testimonials-section, .reservation-section { padding: 80px 30px; }
+            .menu-grid { grid-template-columns: 1fr; }
+            .reservation-form { grid-template-columns: 1fr; }
+            .form-group.full { grid-column: span 1; }
+            .reservation-submit { grid-column: span 1; }
+            .footer-container { grid-template-columns: 1fr; gap: 40px; }
+            .footer-bottom { flex-direction: column; gap: 20px; text-align: center; }
+            body { cursor: auto; }
+            .cursor, .cursor-follower { display: none; }
+        }
+        .reveal { opacity: 0; transform: translateY(60px); }
+        .reveal.active { opacity: 1; transform: translateY(0); transition: all 1s cubic-bezier(0.16, 1, 0.3, 1); }
+    </style>
+</head>
+<body>
+    <div class="cursor"></div>
+    <div class="cursor-follower"></div>
+    <div class="preloader" id="preloader">
+        <div class="preloader-text">L'Artisan</div>
+        <div class="preloader-line"></div>
+        <div class="preloader-sub">Fine Dining Experience</div>
+    </div>
+    <nav class="nav" id="nav">
+        <a href="#" class="nav-logo">L'Artisan</a>
+        <ul class="nav-links">
+            <li><a href="#about">Our Story</a></li>
+            <li><a href="#menu">Menu</a></li>
+            <li><a href="#gallery">Gallery</a></li>
+            <li><a href="#testimonials">Reviews</a></li>
+            <li><a href="#reservation">Reservations</a></li>
+        </ul>
+        <button class="nav-reserve" onclick="document.getElementById('reservation').scrollIntoView({behavior:'smooth'})">Book a Table</button>
+    </nav>
+    <section class="hero" id="hero">
+        <canvas id="hero-canvas"></canvas>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <p class="hero-subtitle">Est. 2018 — Parisian Excellence</p>
+            <h1 class="hero-title">Where Culinary Art <span>Meets Elegance</span></h1>
+            <p class="hero-desc">An intimate sanctuary of gastronomy, where every dish tells a story and every moment becomes a cherished memory.</p>
+            <a href="#reservation" class="hero-cta">Reserve Your Experience <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+        </div>
+        <div class="scroll-indicator"><span>Scroll</span><div class="scroll-line"></div></div>
+    </section>
+    <section class="slideshow-section" id="slideshow">
+        <div class="slideshow-container">
+            <div class="slide active" data-index="0">
+                <div class="slide-bg" style="background-image: url('https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=1920&q=80')"></div>
+                <div class="slide-overlay"></div>
+                <div class="slide-content">
+                    <div class="slide-number">01</div>
+                    <p class="slide-label">The Ambiance</p>
+                    <h2 class="slide-title">Elegant Interiors</h2>
+                    <p class="slide-desc">Step into a world where Art Deco meets modern luxury. Our meticulously designed space features hand-selected marble, custom lighting, and bespoke furnishings.</p>
+                    <a href="#gallery" class="slide-link">Explore Gallery <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+                </div>
+            </div>
+            <div class="slide" data-index="1">
+                <div class="slide-bg" style="background-image: url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1920&q=80')"></div>
+                <div class="slide-overlay"></div>
+                <div class="slide-content">
+                    <div class="slide-number">02</div>
+                    <p class="slide-label">The Cuisine</p>
+                    <h2 class="slide-title">Culinary Mastery</h2>
+                    <p class="slide-desc">Our Executive Chef crafts each dish with precision and passion, using only the finest seasonal ingredients sourced from local artisans and global purveyors.</p>
+                    <a href="#menu" class="slide-link">View Menu <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+                </div>
+            </div>
+            <div class="slide" data-index="2">
+                <div class="slide-bg" style="background-image: url('https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1920&q=80')"></div>
+                <div class="slide-overlay"></div>
+                <div class="slide-content">
+                    <div class="slide-number">03</div>
+                    <p class="slide-label">The Experience</p>
+                    <h2 class="slide-title">Private Dining</h2>
+                    <p class="slide-desc">Host your most important occasions in our exclusive private dining rooms, complete with personalized menus and dedicated service staff.</p>
+                    <a href="#reservation" class="slide-link">Book Private Room <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+                </div>
+            </div>
+            <div class="slide" data-index="3">
+                <div class="slide-bg" style="background-image: url('https://images.unsplash.com/photo-1550966871-3ed3c47e2ce2?w=1920&q=80')"></div>
+                <div class="slide-overlay"></div>
+                <div class="slide-content">
+                    <div class="slide-number">04</div>
+                    <p class="slide-label">The Craft</p>
+                    <h2 class="slide-title">Wine Collection</h2>
+                    <p class="slide-desc">Our sommelier-curated cellar houses over 500 exceptional vintages, carefully selected to complement our culinary creations and elevate your dining experience.</p>
+                    <a href="#menu" class="slide-link">View Wine List <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+                </div>
+            </div>
+        </div>
+        <div class="slideshow-controls">
+            <div class="slide-progress">
+                <div class="progress-bar active" data-index="0"><div class="progress-fill"></div></div>
+                <div class="progress-bar" data-index="1"><div class="progress-fill"></div></div>
+                <div class="progress-bar" data-index="2"><div class="progress-fill"></div></div>
+                <div class="progress-bar" data-index="3"><div class="progress-fill"></div></div>
+            </div>
+            <div class="slide-counter"><span id="current-slide">01</span> <span>/ 04</span></div>
+            <div class="slide-arrows">
+                <button class="slide-arrow" id="prev-slide"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+                <button class="slide-arrow" id="next-slide"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+            </div>
+        </div>
+    </section>
+    <section class="about-section" id="about">
+        <div class="about-container">
+            <div class="about-images reveal">
+                <div class="about-img-frame"></div>
+                <img src="https://images.unsplash.com/photo-1600891964092-4316c288032e?w=800&q=80" alt="Chef preparing dish" class="about-img-main">
+                <img src="https://images.unsplash.com/photo-1551218808-94e220e084d2?w=600&q=80" alt="Restaurant interior" class="about-img-secondary">
+            </div>
+            <div class="about-content reveal">
+                <p class="about-label">Our Story</p>
+                <h2 class="about-title">A Legacy of <span>Excellence</span></h2>
+                <p class="about-text">Founded in 2018 by Chef Antoine Dubois, L'Artisan emerged from a vision to create a dining experience that transcends the ordinary. Drawing inspiration from classical French techniques and contemporary global influences, we have cultivated a culinary identity that is both timeless and innovative.</p>
+                <p class="about-text">Every element of L'Artisan has been thoughtfully curated — from the hand-blown glassware to the artisanal ceramics, from the ambient lighting to the carefully composed playlists. We believe that true luxury lies in the details.</p>
+                <p class="about-signature">— Chef Antoine Dubois</p>
+            </div>
+        </div>
+    </section>
+    <section class="menu-section" id="menu">
+        <div class="menu-header reveal">
+            <p class="menu-label">Culinary Offerings</p>
+            <h2 class="menu-title">Our Menu</h2>
+        </div>
+        <div class="menu-grid">
+            <div class="menu-card reveal">
+                <div class="menu-card-icon">🍽️</div>
+                <h3 class="menu-card-title">Tasting Menu</h3>
+                <p class="menu-card-desc">A seven-course journey through our chef's most inspired creations, featuring seasonal ingredients and artistic presentation.</p>
+                <div class="menu-card-price">$185 <span>/ per person</span></div>
+            </div>
+            <div class="menu-card reveal">
+                <div class="menu-card-icon">🥩</div>
+                <h3 class="menu-card-title">À La Carte</h3>
+                <p class="menu-card-desc">Select from our refined collection of starters, mains, and desserts, each crafted with the same dedication to excellence.</p>
+                <div class="menu-card-price">$45 <span>/ average</span></div>
+            </div>
+            <div class="menu-card reveal">
+                <div class="menu-card-icon">🍷</div>
+                <h3 class="menu-card-title">Wine Pairing</h3>
+                <p class="menu-card-desc">Our sommelier pairs each course with exceptional wines, creating harmonious symphonies of flavor and aroma.</p>
+                <div class="menu-card-price">$95 <span>/ per person</span></div>
+            </div>
+        </div>
+    </section>
+    <section class="gallery-section" id="gallery">
+        <div class="gallery-header reveal">
+            <p class="gallery-label">Visual Journey</p>
+            <h2 class="gallery-title">The Gallery</h2>
+        </div>
+        <div class="gallery-marquee">
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80" alt="Dish 1"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Wagyu Beef Tartare</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=600&q=80" alt="Dish 2"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Truffle Risotto</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=600&q=80" alt="Dish 3"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Seared Scallops</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&q=80" alt="Dish 4"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Artisan Bread Selection</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&q=80" alt="Dish 5"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Chocolate Soufflé</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=600&q=80" alt="Dish 6"><div class="gallery-item-overlay"><h4 class="gallery-item-title">French Toast Brunch</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80" alt="Dish 1"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Wagyu Beef Tartare</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=600&q=80" alt="Dish 2"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Truffle Risotto</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=600&q=80" alt="Dish 3"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Seared Scallops</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&q=80" alt="Dish 4"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Artisan Bread Selection</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&q=80" alt="Dish 5"><div class="gallery-item-overlay"><h4 class="gallery-item-title">Chocolate Soufflé</h4></div></div>
+            <div class="gallery-item"><img src="https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=600&q=80" alt="Dish 6"><div class="gallery-item-overlay"><h4 class="gallery-item-title">French Toast Brunch</h4></div></div>
+        </div>
+    </section>
+    <section class="testimonials-section" id="testimonials">
+        <div class="testimonials-container">
+            <p class="testimonials-label reveal">Guest Experiences</p>
+            <h2 class="testimonials-title reveal">What Our Guests Say</h2>
+            <div class="testimonial-slider">
+                <div class="testimonial-slide active">
+                    <p class="testimonial-quote">"An absolutely transcendent dining experience. The attention to detail in every course was remarkable. L'Artisan has redefined what fine dining means to me."</p>
+                    <p class="testimonial-author">James Whitfield</p>
+                    <p class="testimonial-role">Food Critic, The Gastronome</p>
+                </div>
+                <div class="testimonial-slide">
+                    <p class="testimonial-quote">"From the moment we stepped through the door, we were treated like royalty. The tasting menu was a symphony of flavors that I will never forget."</p>
+                    <p class="testimonial-author">Sophia Laurent</p>
+                    <p class="testimonial-role">Michelin Guide Inspector</p>
+                </div>
+                <div class="testimonial-slide">
+                    <p class="testimonial-quote">"The private dining room was perfect for our anniversary celebration. The personalized menu and impeccable service made it an evening to remember."</p>
+                    <p class="testimonial-author">Michael & Elena Torres</p>
+                    <p class="testimonial-role">Regular Patrons</p>
+                </div>
+            </div>
+            <div class="testimonial-dots">
+                <button class="testimonial-dot active" data-index="0"></button>
+                <button class="testimonial-dot" data-index="1"></button>
+                <button class="testimonial-dot" data-index="2"></button>
+            </div>
+        </div>
+    </section>
+    <section class="reservation-section" id="reservation">
+        <div class="reservation-container">
+            <p class="reservation-label reveal">Book Your Table</p>
+            <h2 class="reservation-title reveal">Make a Reservation</h2>
+            <p class="reservation-subtitle reveal">Secure your place for an unforgettable evening of culinary excellence</p>
+            <form class="reservation-form reveal" onsubmit="event.preventDefault(); alert('Thank you for your reservation request. We will contact you shortly to confirm.');">
+                <div class="form-group"><label>Full Name</label><input type="text" placeholder="John Doe" required></div>
+                <div class="form-group"><label>Email Address</label><input type="email" placeholder="john@example.com" required></div>
+                <div class="form-group"><label>Phone Number</label><input type="tel" placeholder="+1 (555) 000-0000" required></div>
+                <div class="form-group"><label>Date</label><input type="date" required></div>
+                <div class="form-group"><label>Time</label><select required><option value="">Select Time</option><option value="18:00">6:00 PM</option><option value="18:30">6:30 PM</option><option value="19:00">7:00 PM</option><option value="19:30">7:30 PM</option><option value="20:00">8:00 PM</option><option value="20:30">8:30 PM</option><option value="21:00">9:00 PM</option></select></div>
+                <div class="form-group"><label>Guests</label><select required><option value="">Number of Guests</option><option value="1">1 Guest</option><option value="2">2 Guests</option><option value="3">3 Guests</option><option value="4">4 Guests</option><option value="5">5 Guests</option><option value="6">6 Guests</option><option value="7+">7+ Guests</option></select></div>
+                <div class="form-group full"><label>Special Requests</label><textarea placeholder="Dietary restrictions, special occasions, seating preferences..."></textarea></div>
+                <button type="submit" class="reservation-submit">Confirm Reservation</button>
+            </form>
+        </div>
+    </section>
+    <footer class="footer">
+        <div class="footer-container">
+            <div><h3 class="footer-brand">L'Artisan</h3><p class="footer-desc">A sanctuary of gastronomic excellence, where every dish is a masterpiece and every visit is an unforgettable journey.</p></div>
+            <div><h4 class="footer-title">Quick Links</h4><ul class="footer-links"><li><a href="#about">Our Story</a></li><li><a href="#menu">Menu</a></li><li><a href="#gallery">Gallery</a></li><li><a href="#reservation">Reservations</a></li></ul></div>
+            <div><h4 class="footer-title">Hours</h4><ul class="footer-links"><li><a href="#">Tuesday — Thursday: 6PM — 10PM</a></li><li><a href="#">Friday — Saturday: 6PM — 11PM</a></li><li><a href="#">Sunday: 5PM — 9PM</a></li><li><a href="#">Monday: Closed</a></li></ul></div>
+            <div><h4 class="footer-title">Contact</h4><div class="footer-contact"><p><span>Address:</span><br>42 Rue de la Gastronomie<br>Paris, 75008, France</p><p style="margin-top:15px;"><span>Phone:</span><br>+33 1 42 86 82 82</p><p style="margin-top:15px;"><span>Email:</span><br>reservations@lartisan.fr</p></div></div>
+        </div>
+        <div class="footer-bottom"><p class="footer-copy">© 2026 L'Artisan. All rights reserved.</p><div class="footer-social"><a href="#" aria-label="Instagram">IG</a><a href="#" aria-label="Facebook">FB</a><a href="#" aria-label="Twitter">TW</a></div></div>
+    </footer>
+    <script>
+        // Preloader
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('preloader').classList.add('hidden');
+                initHeroAnimations();
+            }, 3000);
+        });
+        // Custom Cursor
+        const cursor = document.querySelector('.cursor');
+        const cursorFollower = document.querySelector('.cursor-follower');
+        let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, followerX = 0, followerY = 0;
+        document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+        function animateCursor() {
+            cursorX += (mouseX - cursorX) * 0.15; cursorY += (mouseY - cursorY) * 0.15;
+            followerX += (mouseX - followerX) * 0.08; followerY += (mouseY - followerY) * 0.08;
+            cursor.style.left = cursorX - 10 + 'px'; cursor.style.top = cursorY - 10 + 'px';
+            cursorFollower.style.left = followerX - 4 + 'px'; cursorFollower.style.top = followerY - 4 + 'px';
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+        document.querySelectorAll('a, button, .menu-card, .gallery-item').forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        });
+        // Three.js 3D Hero
+        function initThreeJS() {
+            const canvas = document.getElementById('hero-canvas');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            // Particles
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCount = 200;
+            const posArray = new Float32Array(particlesCount * 3);
+            const scaleArray = new Float32Array(particlesCount);
+            for (let i = 0; i < particlesCount * 3; i += 3) {
+                posArray[i] = (Math.random() - 0.5) * 15;
+                posArray[i+1] = (Math.random() - 0.5) * 15;
+                posArray[i+2] = (Math.random() - 0.5) * 10;
+                scaleArray[i/3] = Math.random();
+            }
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            particlesGeometry.setAttribute('aScale', new THREE.BufferAttribute(scaleArray, 1));
+            const particlesMaterial = new THREE.PointsMaterial({ size: 0.03, color: 0xc9a84c, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
+            const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particlesMesh);
+            // Floating shapes
+            const shapes = [];
+            const geometries = [new THREE.IcosahedronGeometry(0.3, 0), new THREE.OctahedronGeometry(0.25, 0), new THREE.TetrahedronGeometry(0.2, 0)];
+            for (let i = 0; i < 15; i++) {
+                const geometry = geometries[Math.floor(Math.random() * geometries.length)];
+                const material = new THREE.MeshBasicMaterial({ color: 0xc9a84c, wireframe: true, transparent: true, opacity: 0.15 });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6 - 3);
+                mesh.userData = { rotationSpeed: { x: (Math.random() - 0.5) * 0.01, y: (Math.random() - 0.5) * 0.01, z: (Math.random() - 0.5) * 0.01 }, floatSpeed: Math.random() * 0.5 + 0.5, floatOffset: Math.random() * Math.PI * 2 };
+                shapes.push(mesh); scene.add(mesh);
+            }
+            const ambientLight = new THREE.AmbientLight(0xc9a84c, 0.3);
+            scene.add(ambientLight);
+            camera.position.z = 5;
+            let mousePos = { x: 0, y: 0 };
+            document.addEventListener('mousemove', (e) => { mousePos.x = (e.clientX / window.innerWidth) * 2 - 1; mousePos.y = -(e.clientY / window.innerHeight) * 2 + 1; });
+            let time = 0;
+            function animate() {
+                requestAnimationFrame(animate); time += 0.01;
+                particlesMesh.rotation.y = time * 0.1; particlesMesh.rotation.x = time * 0.05;
+                shapes.forEach((shape) => {
+                    shape.rotation.x += shape.userData.rotationSpeed.x;
+                    shape.rotation.y += shape.userData.rotationSpeed.y;
+                    shape.rotation.z += shape.userData.rotationSpeed.z;
+                    shape.position.y += Math.sin(time * shape.userData.floatSpeed + shape.userData.floatOffset) * 0.002;
+                });
+                camera.position.x += (mousePos.x * 0.5 - camera.position.x) * 0.02;
+                camera.position.y += (mousePos.y * 0.3 - camera.position.y) * 0.02;
+                camera.lookAt(0, 0, 0);
+                renderer.render(scene, camera);
+            }
+            animate();
+            window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        }
+        initThreeJS();
+        // Hero Animations
+        function initHeroAnimations() {
+            const tl = gsap.timeline();
+            tl.to('.hero-subtitle', { opacity: 1, y: 0, duration: 1, ease: 'power3.out' })
+              .to('.hero-title', { opacity: 1, y: 0, duration: 1.2, ease: 'power3.out' }, '-=0.6')
+              .to('.hero-desc', { opacity: 1, y: 0, duration: 1, ease: 'power3.out' }, '-=0.6')
+              .to('.hero-cta', { opacity: 1, y: 0, duration: 1, ease: 'power3.out' }, '-=0.5')
+              .to('.scroll-indicator', { opacity: 1, duration: 1, ease: 'power3.out' }, '-=0.3');
+        }
+        // Navigation scroll effect
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('nav');
+            if (window.scrollY > 100) nav.classList.add('scrolled');
+            else nav.classList.remove('scrolled');
+        });
+        // Smooth scroll for nav links
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) target.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+        // Slideshow
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const progressBars = document.querySelectorAll('.progress-bar');
+        const currentSlideEl = document.getElementById('current-slide');
+        let slideInterval;
+        function goToSlide(index) {
+            slides.forEach((slide, i) => { slide.classList.toggle('active', i === index); });
+            progressBars.forEach((bar, i) => {
+                bar.classList.toggle('active', i === index);
+                if (i !== index) { const fill = bar.querySelector('.progress-fill'); fill.style.animation = 'none'; fill.offsetHeight; fill.style.animation = ''; }
+            });
+            currentSlideEl.textContent = String(index + 1).padStart(2, '0');
+            currentSlide = index;
+        }
+        function nextSlide() { goToSlide((currentSlide + 1) % slides.length); }
+        function prevSlide() { goToSlide((currentSlide - 1 + slides.length) % slides.length); }
+        function startSlideshow() { slideInterval = setInterval(nextSlide, 6000); }
+        function stopSlideshow() { clearInterval(slideInterval); }
+        document.getElementById('next-slide').addEventListener('click', () => { stopSlideshow(); nextSlide(); startSlideshow(); });
+        document.getElementById('prev-slide').addEventListener('click', () => { stopSlideshow(); prevSlide(); startSlideshow(); });
+        startSlideshow();
+        // Testimonials
+        let currentTestimonial = 0;
+        const testimonialSlides = document.querySelectorAll('.testimonial-slide');
+        const testimonialDots = document.querySelectorAll('.testimonial-dot');
+        function goToTestimonial(index) {
+            testimonialSlides.forEach((slide, i) => { slide.classList.toggle('active', i === index); });
+            testimonialDots.forEach((dot, i) => { dot.classList.toggle('active', i === index); });
+            currentTestimonial = index;
+        }
+        testimonialDots.forEach(dot => {
+            dot.addEventListener('click', () => { goToTestimonial(parseInt(dot.dataset.index)); });
+        });
+        setInterval(() => { goToTestimonial((currentTestimonial + 1) % testimonialSlides.length); }, 5000);
+        // Scroll Reveal
+        const revealElements = document.querySelectorAll('.reveal');
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                    revealObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+        revealElements.forEach(el => revealObserver.observe(el));
+        // Parallax for about images
+        window.addEventListener('scroll', () => {
+            const scrolled = window.scrollY;
+            const aboutSection = document.querySelector('.about-section');
+            if (aboutSection) {
+                const rect = aboutSection.getBoundingClientRect();
+                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                    const offset = (window.innerHeight - rect.top) * 0.05;
+                    document.querySelector('.about-img-main').style.transform = `translateY(${offset * 0.3}px)`;
+                    document.querySelector('.about-img-secondary').style.transform = `translateY(${offset * 0.5}px)`;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
